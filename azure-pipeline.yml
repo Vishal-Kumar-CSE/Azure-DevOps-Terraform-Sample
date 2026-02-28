@@ -1,0 +1,65 @@
+trigger:
+- master
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Build
+    displayName: Build Job
+    jobs:
+      - job: Build
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: TerraformInstaller@1
+            displayName: TF install
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTask@5
+            displayName: TF init
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: '$(SERVICE-CONNECTION)'
+              backendAzureRmStorageAccountName: 'mystgacc'
+              backendAzureRmContainerName: 'remote-backend'
+              backendAzureRmKey: 'tf.remotestate.tfstate'
+          - task: TerraformTask@5
+            displayName: TF validate
+            inputs:
+              provider: 'azurerm'
+              command: 'validate'
+          
+          - task: TerraformTask@5
+            displayName: TF fmt
+            inputs:
+              provider: 'azurerm'
+              command: 'custom'
+              outputTo: 'console'
+              customCommand: 'fmt'
+              environmentServiceNameAzureRM: '$(SERVICE-CONNECTION)'
+          - task: TerraformTask@5
+            displayName: TF plan
+            inputs:
+              provider: 'azurerm'
+              command: 'plan'
+              commandOptions: '-out $(System.DefaultWorkingDirectory)/tfplanfile'
+              environmentServiceNameAzureRM: '$(SERVICE-CONNECTION)'
+          - task: ArchiveFiles@2
+            displayName: TF archive
+            inputs:
+              rootFolderOrFile: '$(Build.SourcesDirectory)'
+              includeRootFolder: true
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/$(Build.BuildId).zip'
+              replaceExistingArchive: true
+          - task: PublishBuildArtifacts@1
+            displayName: Publish Build Artifacts
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: '$(Build.BuildId)-build'
+              publishLocation: 'Container'
+          
+
+          
